@@ -17,6 +17,8 @@ Window {
     height: 800
     color: "#0f1422"
 
+    onClosing: Qt.quit()
+
     // Wallpaper background
     Rectangle {
         id: wallpaperLayer

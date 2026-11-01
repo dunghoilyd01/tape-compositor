@@ -45,8 +45,8 @@ public:
 
     Window* addXdgToplevel(QWaylandXdgToplevel* toplevel, QWaylandXdgSurface* xdgSurface);
     Window* addMockWindow(const QString& title, const QString& appId);
-    void removeWindow(Window* window);
 
+    Q_INVOKABLE void removeWindow(Tape::Window* window);
     Q_INVOKABLE void activateWindow(Tape::Window* window);
     Q_INVOKABLE void raiseWindow(Tape::Window* window);
     Q_INVOKABLE void toggleMinimize(Tape::Window* window);

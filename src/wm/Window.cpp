@@ -11,33 +11,62 @@ Window::Window(QWaylandXdgToplevel* toplevel, QWaylandXdgSurface* xdgSurface, QO
     , m_windowId(s_nextWindowId++)
     , m_toplevel(toplevel)
     , m_xdgSurface(xdgSurface)
+    , m_surface(xdgSurface != nullptr ? xdgSurface->surface() : nullptr)
 {
     const qreal cascadeOffset = static_cast<qreal>((m_windowId - 1) % 8) * 32.0;
     m_geometry.moveTopLeft(QPointF(96.0 + cascadeOffset, 60.0 + cascadeOffset));
     m_savedGeometry = m_geometry;
 
-    if (m_toplevel != nullptr) {
-        connect(m_toplevel, &QWaylandXdgToplevel::titleChanged, this, &Window::titleChanged);
-        connect(m_toplevel, &QWaylandXdgToplevel::appIdChanged, this, &Window::appIdChanged);
-        connect(m_toplevel, &QWaylandXdgToplevel::decorationModeChanged, this, &Window::serverDecoratedChanged);
+    if (!m_toplevel.isNull()) {
+        m_cachedTitle = m_toplevel->title();
+        m_cachedAppId = m_toplevel->appId();
+
+        connect(m_toplevel, &QWaylandXdgToplevel::titleChanged, this, [this]() {
+            if (!m_toplevel.isNull()) {
+                m_cachedTitle = m_toplevel->title();
+            }
+            Q_EMIT titleChanged();
+        });
+        connect(m_toplevel, &QWaylandXdgToplevel::appIdChanged, this, [this]() {
+            if (!m_toplevel.isNull()) {
+                m_cachedAppId = m_toplevel->appId();
+            }
+            Q_EMIT appIdChanged();
+        });
+        connect(m_toplevel, &QWaylandXdgToplevel::decorationModeChanged,
+            this, &Window::serverDecoratedChanged);
         connect(m_toplevel, &QWaylandXdgToplevel::setMinimized, this, [this]() {
             setMinimized(true);
         });
+        connect(m_toplevel, &QWaylandXdgToplevel::setMaximized, this, [this]() {
+            Q_EMIT clientRequestedMaximize(true);
+        });
+        connect(m_toplevel, &QWaylandXdgToplevel::unsetMaximized, this, [this]() {
+            Q_EMIT clientRequestedMaximize(false);
+        });
+        connect(m_toplevel, &QObject::destroyed, this, [this]() {
+            notifyClosedOnce();
+        });
     }
 
-    if (m_xdgSurface != nullptr) {
-        connect(m_xdgSurface, &QWaylandXdgSurface::windowGeometryChanged, this, &Window::geometryChanged);
-        if (m_xdgSurface->surface() != nullptr) {
-            connect(m_xdgSurface->surface(), &QWaylandSurface::hasContentChanged, this, [this]() {
-                if (m_xdgSurface != nullptr && m_xdgSurface->surface() != nullptr
-                    && !m_xdgSurface->surface()->hasContent()) {
-                    Q_EMIT closed(this);
-                }
-            });
-            connect(m_xdgSurface->surface(), &QObject::destroyed, this, [this]() {
-                Q_EMIT closed(this);
-            });
-        }
+    if (!m_xdgSurface.isNull()) {
+        connect(m_xdgSurface, &QWaylandXdgSurface::windowGeometryChanged,
+            this, &Window::geometryChanged);
+        connect(m_xdgSurface, &QObject::destroyed, this, [this]() {
+            Q_EMIT shellSurfaceChanged();
+            notifyClosedOnce();
+        });
+    }
+
+    if (!m_surface.isNull()) {
+        connect(m_surface, &QWaylandSurface::hasContentChanged, this, [this]() {
+            if (!m_surface.isNull() && !m_surface->hasContent()) {
+                notifyClosedOnce();
+            }
+        });
+        connect(m_surface, &QObject::destroyed, this, [this]() {
+            notifyClosedOnce();
+        });
     }
 
     qCDebug(lcWm, "Created Window id=%llu appId='%s' title='%s'",
@@ -49,56 +78,61 @@ Window::Window(QWaylandXdgToplevel* toplevel, QWaylandXdgSurface* xdgSurface, QO
 Window::Window(const QString& mockTitle, const QString& mockAppId, QObject* parent)
     : QObject(parent)
     , m_windowId(s_nextWindowId++)
-    , m_fallbackTitle(mockTitle)
-    , m_fallbackAppId(mockAppId)
+    , m_cachedTitle(mockTitle)
+    , m_cachedAppId(mockAppId)
 {
+}
+
+void Window::notifyClosedOnce()
+{
+    if (m_closing) {
+        return;
+    }
+    m_closing = true;
+    qCDebug(lcWm, "Window id=%llu closed", static_cast<unsigned long long>(m_windowId));
+    Q_EMIT closed(this);
 }
 
 QString Window::title() const
 {
-    if (m_toplevel != nullptr && !m_toplevel->title().isEmpty()) {
+    if (!m_toplevel.isNull() && !m_toplevel->title().isEmpty()) {
         return m_toplevel->title();
     }
-    if (!m_fallbackTitle.isEmpty()) {
-        return m_fallbackTitle;
+    if (!m_cachedTitle.isEmpty()) {
+        return m_cachedTitle;
     }
     return appId();
 }
 
 QString Window::appId() const
 {
-    if (m_toplevel != nullptr && !m_toplevel->appId().isEmpty()) {
+    if (!m_toplevel.isNull() && !m_toplevel->appId().isEmpty()) {
         return m_toplevel->appId();
     }
-    if (!m_fallbackAppId.isEmpty()) {
-        return m_fallbackAppId;
+    if (!m_cachedAppId.isEmpty()) {
+        return m_cachedAppId;
     }
     return QStringLiteral("Application");
 }
 
-QWaylandSurface* Window::surface() const
-{
-    return (m_xdgSurface != nullptr) ? m_xdgSurface->surface() : nullptr;
-}
-
 qreal Window::width() const
 {
-    if (m_xdgSurface != nullptr && m_xdgSurface->windowGeometry().width() > 0) {
+    if (!m_xdgSurface.isNull() && m_xdgSurface->windowGeometry().width() > 0) {
         return m_xdgSurface->windowGeometry().width();
     }
-    if (surface() != nullptr && surface()->destinationSize().width() > 0) {
-        return surface()->destinationSize().width();
+    if (!m_surface.isNull() && m_surface->destinationSize().width() > 0) {
+        return m_surface->destinationSize().width();
     }
     return m_geometry.width();
 }
 
 qreal Window::height() const
 {
-    if (m_xdgSurface != nullptr && m_xdgSurface->windowGeometry().height() > 0) {
+    if (!m_xdgSurface.isNull() && m_xdgSurface->windowGeometry().height() > 0) {
         return m_xdgSurface->windowGeometry().height();
     }
-    if (surface() != nullptr && surface()->destinationSize().height() > 0) {
-        return surface()->destinationSize().height();
+    if (!m_surface.isNull() && m_surface->destinationSize().height() > 0) {
+        return m_surface->destinationSize().height();
     }
     return m_geometry.height();
 }
@@ -145,7 +179,8 @@ void Window::setActivated(bool active)
         return;
     }
     m_activated = active;
-    if (m_toplevel != nullptr) {
+    if (!m_closing && !m_toplevel.isNull() && !m_xdgSurface.isNull()
+        && !m_surface.isNull() && m_surface->hasContent()) {
         QList<QWaylandXdgToplevel::State> states;
         if (m_maximized) {
             states.append(QWaylandXdgToplevel::MaximizedState);
@@ -184,13 +219,13 @@ void Window::setMaximizedState(bool maximized, const QRectF& targetGeometry)
             m_geometry = targetGeometry;
         }
         m_maximized = true;
-        if (m_toplevel != nullptr) {
+        if (!m_closing && !m_toplevel.isNull()) {
             m_toplevel->sendMaximized(m_geometry.size().toSize());
         }
     } else {
         m_maximized = false;
         m_geometry = m_savedGeometry;
-        if (m_toplevel != nullptr) {
+        if (!m_closing && !m_toplevel.isNull()) {
             m_toplevel->sendUnmaximized(m_savedGeometry.size().toSize());
         }
     }
@@ -200,7 +235,7 @@ void Window::setMaximizedState(bool maximized, const QRectF& targetGeometry)
 
 bool Window::isServerDecorated() const
 {
-    if (m_toplevel == nullptr) {
+    if (m_toplevel.isNull()) {
         return true;
     }
     return m_toplevel->decorationMode() != QWaylandXdgToplevel::ClientSideDecoration;
@@ -209,10 +244,10 @@ bool Window::isServerDecorated() const
 void Window::requestClose()
 {
     qCDebug(lcWm, "Requesting close for Window id=%llu", static_cast<unsigned long long>(m_windowId));
-    if (m_toplevel != nullptr) {
+    if (!m_toplevel.isNull()) {
         m_toplevel->sendClose();
     } else {
-        Q_EMIT closed(this);
+        notifyClosedOnce();
     }
 }
 

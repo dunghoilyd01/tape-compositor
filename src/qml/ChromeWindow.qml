@@ -25,11 +25,51 @@ Item {
     z: window ? window.zOrder : 0
     visible: window ? !window.minimized : false
 
-    // KDE Breeze window frame & active accent border
+    onXChanged: {
+        if (window && Math.abs(window.x - x) > 0.5) {
+            window.x = x
+        }
+    }
+    onYChanged: {
+        if (window && Math.abs(window.y - y) > 0.5) {
+            window.y = y
+        }
+    }
+
+    Connections {
+        target: chromeRoot.window
+        function onGeometryChanged() {
+            if (chromeRoot.window) {
+                if (Math.abs(chromeRoot.x - chromeRoot.window.x) > 0.5) {
+                    chromeRoot.x = chromeRoot.window.x
+                }
+                if (Math.abs(chromeRoot.y - chromeRoot.window.y) > 0.5) {
+                    chromeRoot.y = chromeRoot.window.y
+                }
+            }
+        }
+        function onClientRequestedMaximize(maximize) {
+            if (chromeRoot.compositor && chromeRoot.compositor.windowModel && chromeRoot.window) {
+                if (chromeRoot.window.maximized !== maximize) {
+                    chromeRoot.compositor.windowModel.toggleMaximize(
+                        chromeRoot.window,
+                        chromeRoot.availableX,
+                        chromeRoot.availableY,
+                        chromeRoot.availableWidth,
+                        chromeRoot.availableHeight
+                    )
+                }
+            }
+        }
+    }
+
+    // KDE Breeze window frame & active accent border (only for Server-Side Decorated windows;
+    // Client-Side Decorated apps like Firefox/GTK draw their own frame and transparent shadow margin)
     Rectangle {
+        visible: chromeRoot.isServerDecorated
         anchors.fill: parent
         anchors.margins: -1
-        radius: chromeRoot.isServerDecorated ? 5 : 0
+        radius: 5
         color: "#232629"
         border.width: 1
         border.color: chromeRoot.isActive ? "#3daee9" : "#3b4045"

@@ -2,6 +2,7 @@
 #pragma once
 
 #include <QObject>
+#include <QPointer>
 #include <QRectF>
 #include <QString>
 #include <QtWaylandCompositor/QWaylandShellSurface>
@@ -16,7 +17,7 @@ class Window : public QObject {
     Q_PROPERTY(quint64 windowId READ windowId CONSTANT)
     Q_PROPERTY(QString title READ title NOTIFY titleChanged)
     Q_PROPERTY(QString appId READ appId NOTIFY appIdChanged)
-    Q_PROPERTY(QWaylandShellSurface* shellSurface READ shellSurface CONSTANT)
+    Q_PROPERTY(QWaylandShellSurface* shellSurface READ shellSurface NOTIFY shellSurfaceChanged)
     Q_PROPERTY(QWaylandXdgToplevel* toplevel READ toplevel CONSTANT)
     Q_PROPERTY(qreal x READ x WRITE setX NOTIFY geometryChanged)
     Q_PROPERTY(qreal y READ y WRITE setY NOTIFY geometryChanged)
@@ -38,10 +39,10 @@ public:
     QString title() const;
     QString appId() const;
 
-    QWaylandShellSurface* shellSurface() const { return m_xdgSurface; }
-    QWaylandXdgSurface* xdgSurface() const { return m_xdgSurface; }
-    QWaylandXdgToplevel* toplevel() const { return m_toplevel; }
-    QWaylandSurface* surface() const;
+    QWaylandShellSurface* shellSurface() const { return m_xdgSurface.data(); }
+    QWaylandXdgSurface* xdgSurface() const { return m_xdgSurface.data(); }
+    QWaylandXdgToplevel* toplevel() const { return m_toplevel.data(); }
+    QWaylandSurface* surface() const { return m_surface.data(); }
 
     qreal x() const { return m_geometry.x(); }
     qreal y() const { return m_geometry.y(); }
@@ -73,6 +74,7 @@ public:
 Q_SIGNALS:
     void titleChanged();
     void appIdChanged();
+    void shellSurfaceChanged();
     void geometryChanged();
     void zOrderChanged();
     void activatedChanged();
@@ -80,16 +82,20 @@ Q_SIGNALS:
     void maximizedChanged();
     void fullscreenChanged();
     void serverDecoratedChanged();
+    void clientRequestedMaximize(bool maximize);
     void closed(Tape::Window* window);
 
 private:
+    void notifyClosedOnce();
+
     static quint64 s_nextWindowId;
 
     quint64 m_windowId = 0;
-    QWaylandXdgToplevel* m_toplevel = nullptr;
-    QWaylandXdgSurface* m_xdgSurface = nullptr;
-    QString m_fallbackTitle;
-    QString m_fallbackAppId;
+    QPointer<QWaylandXdgToplevel> m_toplevel;
+    QPointer<QWaylandXdgSurface> m_xdgSurface;
+    QPointer<QWaylandSurface> m_surface;
+    QString m_cachedTitle;
+    QString m_cachedAppId;
     QRectF m_geometry { 120.0, 80.0, 720.0, 480.0 };
     QRectF m_savedGeometry { 120.0, 80.0, 720.0, 480.0 };
     int m_zOrder = 0;
@@ -97,6 +103,7 @@ private:
     bool m_minimized = false;
     bool m_maximized = false;
     bool m_fullscreen = false;
+    bool m_closing = false;
 };
 
 } // namespace Tape

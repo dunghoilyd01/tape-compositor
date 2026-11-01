@@ -16,6 +16,7 @@ int main(int argc, char* argv[])
     QCoreApplication::setApplicationVersion(QStringLiteral(TAPE_VERSION_STRING));
 
     QGuiApplication guiApp(argc, argv);
+    QGuiApplication::setQuitOnLastWindowClosed(false);
 
     const Tape::CommandLineOptions options = Tape::CommandLine::parse(QCoreApplication::arguments());
     if (!options.parseOk) {

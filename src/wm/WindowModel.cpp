@@ -125,12 +125,26 @@ void WindowModel::registerWindow(Window* window)
 
 void WindowModel::removeWindow(Window* window)
 {
+    if (window == nullptr) {
+        return;
+    }
+
     const int row = indexOfWindow(window);
     if (row < 0) {
         return;
     }
 
+    window->disconnect(this);
+
+    if (m_seat != nullptr && window->surface() != nullptr
+        && m_seat->keyboardFocus() == window->surface()) {
+        m_seat->setKeyboardFocus(nullptr);
+    }
+
     const bool wasActive = (m_activeWindow == window);
+    if (wasActive) {
+        m_activeWindow = nullptr;
+    }
 
     beginRemoveRows(QModelIndex(), row, row);
     m_windows.removeAt(row);
@@ -140,7 +154,6 @@ void WindowModel::removeWindow(Window* window)
     Q_EMIT windowRemoved(window);
 
     if (wasActive) {
-        m_activeWindow = nullptr;
         Window* next = findTopmostVisibleWindow();
         if (next != nullptr) {
             activateWindow(next);
