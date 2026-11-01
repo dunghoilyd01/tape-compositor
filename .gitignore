@@ -1,0 +1,38 @@
+# Build directories
+build/
+build-*/
+out/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+Makefile
+*.ninja
+.ninja_deps
+.ninja_log
+CTestTestfile.cmake
+Testing/
+
+# IDE / Editor
+.vscode/
+.idea/
+.cache/
+.clangd/
+*.swp
+*~
+*.user
+
+# Binary & object artifacts
+*.o
+*.so
+*.so.*
+*.a
+tape
+tape-settings
+tapectl
+
+# Generated QML / Wayland artifacts
+.qt/
+.rcc/
+*_autogen/
+qtc_*/

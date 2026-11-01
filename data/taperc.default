@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Default configuration for Tape Wayland Compositor (PLAN §18)
+# User overrides reside in ~/.config/taperc
+
+[General]
+# Focus policy: Click | FollowMouse
+FocusPolicy=Click
+# Default window decoration style (KDE Breeze)
+DecorationButtonStyle=Breeze
+
+[Render]
+# Qt Quick render loop: threaded | basic
+Loop=threaded
+
+[Shell]
+# Top panel + bottom dock layout options (R19, Breeze-styled)
+TopBarHeight=28
+DockIconSize=48
+DockAutoHide=false
+DockMagnification=true
+
+[Wallpaper]
+# Mode: SolidColor | ImageFill | ImageFit | ImageStretch | ImageCenter | ImageTile
+Mode=SolidColor
+PrimaryColor=#232629
+SecondaryColor=#1b1e20
+ImagePath=
+
+[Effects]
+Wobbly=true
+MagicLamp=true
+Blur=true
+BlurStrength=6
+
+[InputMethod]
+Enabled=true
+Program=fcitx5
+
+[Power.AC]
+DimAfterSec=300
+ScreenOffAfterSec=600
+SuspendAfterSec=0
+
+[Power.Battery]
+DimAfterSec=120
+ScreenOffAfterSec=300
+SuspendAfterSec=900
+
+[Debug]
+# Runtime debug logging (R5)
+Enabled=false
+Categories=
+ProtocolLogging=false
